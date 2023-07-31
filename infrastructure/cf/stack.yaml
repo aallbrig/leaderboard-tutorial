@@ -1,0 +1,32 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Stack for leaderboard tutorial
+
+Parameters:
+  DBUsername:
+    Type: String
+    Description: Aurora database master user
+    NoEcho: true
+    Default: admin
+
+Resources:
+  DBCredentials:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: /aurora/Leaderboard-credentials
+      Description: 'Aurora mysql database credentials'
+      GenerateSecretString:
+        SecretStringTemplate: !Sub '{"username": "${DBUsername}"}'
+        GenerateStringKey: password
+        PasswordLength: 24
+        ExcludeCharacters: "\"'@/\\"
+
+  AuroraDBCluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      MasterUsername: !Sub "{{resolve:secretsmanager:${DBCredentials}::username}}"
+      MasterUserPassword: !Sub "{{resolve:secretsmanager:${DBCredentials}::password}}"
+      EnableHttpEndpoint: true
+      Engine: aurora-mysql
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: 1
+        MaxCapacity: 1
