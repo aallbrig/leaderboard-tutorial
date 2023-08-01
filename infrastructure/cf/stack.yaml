@@ -2,31 +2,75 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: Stack for leaderboard tutorial
 
 Parameters:
-  DBUsername:
+  DbUsername:
     Type: String
     Description: Aurora database master user
     NoEcho: true
     Default: admin
+  DbDatabaseName:
+    Type: String
+    Description: Aurora database name
+    Default: leaderboard
+  VpcId:
+    Type: String
+  SubnetIds:
+    Type: CommaDelimitedList
+
+Outputs:
+  DbEndpoint:
+    Description: Aurora database endpoint (includes port)
+    Value: !Sub "${AuroraDbCluster.Endpoint.Address}:${AuroraDbCluster.Endpoint.Port}"
+  SecretsArn:
+    Description: Secrets ARN
+    Value: !Ref DbCredentials
 
 Resources:
-  DBCredentials:
+  DbCredentials:
     Type: AWS::SecretsManager::Secret
     Properties:
       Name: /aurora/Leaderboard-credentials
-      Description: 'Aurora mysql database credentials'
+      Description: Aurora mysql database credentials
       GenerateSecretString:
-        SecretStringTemplate: !Sub '{"username": "${DBUsername}"}'
+        SecretStringTemplate: !Sub '{"username": "${DbUsername}"}'
         GenerateStringKey: password
         PasswordLength: 24
         ExcludeCharacters: "\"'@/\\"
 
-  AuroraDBCluster:
+  AuroraDbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Aurora database security group to access from bastion
+      VpcId: !Ref VpcId
+
+  MySqlIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      IpProtocol: tcp
+      FromPort: 3306
+      ToPort: 3306
+      CidrIp: 0.0.0.0/0
+      GroupId: !GetAtt AuroraDbSecurityGroup.GroupId
+
+  AuroraSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for Aurora Serverless v1
+      SubnetIds: !Ref SubnetIds
+
+  AuroraDbCluster:
     Type: AWS::RDS::DBCluster
     Properties:
-      MasterUsername: !Sub "{{resolve:secretsmanager:${DBCredentials}::username}}"
-      MasterUserPassword: !Sub "{{resolve:secretsmanager:${DBCredentials}::password}}"
+      MasterUsername: !Sub "{{resolve:secretsmanager:${DbCredentials}::username}}"
+      MasterUserPassword: !Sub "{{resolve:secretsmanager:${DbCredentials}::password}}"
       EnableHttpEndpoint: true
+      DatabaseName: !Ref DbDatabaseName
       Engine: aurora-mysql
-      ServerlessV2ScalingConfiguration:
+      EngineMode: serverless
+      ScalingConfiguration:
+        AutoPause: true
         MinCapacity: 1
         MaxCapacity: 1
+        SecondsUntilAutoPause: 1000
+      VpcSecurityGroupIds:
+        - !GetAtt AuroraDbSecurityGroup.GroupId
+      DBSubnetGroupName: !Ref AuroraSubnetGroup
