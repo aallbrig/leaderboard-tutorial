@@ -20,6 +20,9 @@ Outputs:
   DbEndpoint:
     Description: Aurora database endpoint (includes port)
     Value: !Sub "${AuroraDbCluster.Endpoint.Address}:${AuroraDbCluster.Endpoint.Port}"
+  DatabaseArn:
+    Description: Database ARN
+    Value: !GetAtt AuroraDbCluster.DBClusterArn
   SecretsArn:
     Description: Secrets ARN
     Value: !Ref DbCredentials
@@ -41,15 +44,11 @@ Resources:
     Properties:
       GroupDescription: Aurora database security group to access from bastion
       VpcId: !Ref VpcId
-
-  MySqlIngress:
-    Type: AWS::EC2::SecurityGroupIngress
-    Properties:
-      IpProtocol: tcp
-      FromPort: 3306
-      ToPort: 3306
-      CidrIp: 0.0.0.0/0
-      GroupId: !GetAtt AuroraDbSecurityGroup.GroupId
+      SecurityGroupIngress:
+        IpProtocol: tcp
+        FromPort: 3306
+        ToPort: 3306
+        CidrIp: 0.0.0.0/0
 
   AuroraSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
@@ -71,6 +70,3 @@ Resources:
         MinCapacity: 1
         MaxCapacity: 1
         SecondsUntilAutoPause: 1000
-      VpcSecurityGroupIds:
-        - !GetAtt AuroraDbSecurityGroup.GroupId
-      DBSubnetGroupName: !Ref AuroraSubnetGroup

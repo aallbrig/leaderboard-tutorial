@@ -1,0 +1,45 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Leaderboard Cache
+
+Parameters:
+  SubnetIds:
+    Type: CommaDelimitedList
+  CacheSubnetGroupName:
+    Type: String
+    Default: redis-leaderboard
+  RedisSecurityGroupName:
+    Type: String
+    Default: leaderboard-lambda
+
+Outputs:
+  RedisSecurityGroupId:
+    Description: Redis security group ID
+    Value: !GetAtt RedisSecurityGroup.GroupId
+
+Resources:
+  RedisSubnet:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      CacheSubnetGroupName: !Ref CacheSubnetGroupName
+      Description: Redis subnet group
+      SubnetIds: !Ref SubnetIds
+
+  RedisSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Ref RedisSecurityGroupName
+      GroupDescription: Redis security group
+      SecurityGroupIngress:
+        IpProtocol: TCP
+        FromPort: 6379
+        ToPort: 6379
+        CidrIp: 0.0.0.0/0
+
+  RedisCache:
+    Type: AWS::ElastiCache::CacheCluster
+    Properties:
+      CacheNodeType: cache.t2.micro
+      Engine: redis
+      NumCacheNodes: 1
+      VpcSecurityGroupIds:
+        - !GetAtt RedisSecurityGroup.GroupId
